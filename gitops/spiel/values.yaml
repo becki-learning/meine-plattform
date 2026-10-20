@@ -3,5 +3,5 @@ host: spiel.example.sslip.io
 
 # Wird von GitHub Actions bei jedem Build aktualisiert
 image:
-  repository: ghcr.io/OWNER/reaktionsspiel
-  tag: "latest"
+  repository: ghcr.io/becki-learning/reaktionsspiel
+  tag: "d60b12d9831944fec0ed5fee54c72aef3c4ae3df"
