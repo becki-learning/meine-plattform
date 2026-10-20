@@ -1,0 +1,19 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: spiel
+      POSTGRES_PASSWORD: spiel
+      POSTGRES_DB: spiel
+
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      PGHOST: db
+      PGUSER: spiel
+      PGPASSWORD: spiel
+      PGDATABASE: spiel
+    depends_on:
+      - db

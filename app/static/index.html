@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reaktionstest</title>
+  <style>
+    body   { font-family: system-ui, sans-serif; margin: 0; background: #111827; color: #f9fafb; }
+    main   { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem; }
+    h1     { margin: 0 0 .25rem; }
+    .info  { color: #9ca3af; font-size: .9rem; margin-bottom: 1rem; }
+    #feld  { height: 16rem; border-radius: 1rem; display: flex; align-items: center; justify-content: center;
+             text-align: center; padding: 1rem; font-size: 1.6rem; font-weight: 700;
+             cursor: pointer; user-select: none; background: #374151; }
+    #feld.warten { background: #b91c1c; }
+    #feld.jetzt  { background: #16a34a; }
+    form          { display: none; gap: .5rem; margin-top: 1rem; }
+    form.sichtbar { display: flex; }
+    input, button { font-size: 1rem; padding: .6rem .8rem; border-radius: .5rem; border: 0; }
+    input  { flex: 1; }
+    button { background: #2563eb; color: #fff; cursor: pointer; }
+    table  { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { text-align: left; padding: .4rem; border-bottom: 1px solid #374151; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>⚡ Reaktionstest</h1>
+  <div class="info" id="server">Verbinde …</div>
+
+  <div id="feld">Klicken zum Starten</div>
+
+  <form id="formular">
+    <input id="name" maxlength="20" placeholder="Dein Name" required>
+    <button>In die Bestenliste</button>
+  </form>
+
+  <h2>🏆 Bestenliste</h2>
+  <table>
+    <thead><tr><th>#</th><th>Name</th><th>Zeit</th><th>Gespeichert auf</th></tr></thead>
+    <tbody id="liste"></tbody>
+  </table>
+</main>
+
+<script>
+  const feld = document.getElementById("feld");
+  const formular = document.getElementById("formular");
+  let zustand = "start";            // start -> warten -> jetzt -> ergebnis
+  let timer, startzeit, letzteZeit;
+
+  feld.addEventListener("pointerdown", () => {
+    if (zustand === "warten") {                       // zu früh geklickt
+      clearTimeout(timer);
+      zustand = "start";
+      feld.className = "";
+      feld.textContent = "Zu früh! 😅 Nochmal klicken";
+    } else if (zustand === "jetzt") {                 // Treffer!
+      letzteZeit = Math.round(performance.now() - startzeit);
+      zustand = "start";
+      feld.className = "";
+      feld.textContent = `${letzteZeit} ms – nochmal? Klicken!`;
+      formular.classList.add("sichtbar");
+    } else {                                          // neue Runde
+      zustand = "warten";
+      feld.className = "warten";
+      feld.textContent = "Warte auf Grün …";
+      formular.classList.remove("sichtbar");
+      timer = setTimeout(() => {
+        zustand = "jetzt";
+        feld.className = "jetzt";
+        feld.textContent = "JETZT!";
+        startzeit = performance.now();
+      }, 1000 + Math.random() * 3000);
+    }
+  });
+
+  formular.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const antwort = await fetch("api/score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: document.getElementById("name").value, ms: letzteZeit }),
+    });
+    const daten = await antwort.json();
+    formular.classList.remove("sichtbar");
+    feld.textContent = antwort.ok
+      ? `Platz ${daten.platz}! Gespeichert von ${daten.pod}`
+      : `Fehler: ${daten.fehler}`;
+    ladeBestenliste();
+  });
+
+  function sicher(text) {           // verhindert, dass jemand HTML/JS als Namen einschleust
+    return String(text).replace(/[&<>"']/g, z => `&#${z.charCodeAt(0)};`);
+  }
+
+  async function ladeBestenliste() {
+    const liste = await (await fetch("api/highscores")).json();
+    document.getElementById("liste").innerHTML = liste.map((e, i) =>
+      `<tr><td>${i + 1}</td><td>${sicher(e.name)}</td><td>${e.ms} ms</td><td>${sicher(e.knoten)}</td></tr>`
+    ).join("");
+  }
+
+  async function ladeInfo() {       // jeder Aufruf kann bei einem anderen Pod landen!
+    try {
+      const d = await (await fetch("api/info")).json();
+      document.getElementById("server").textContent = `Antwort von Pod ${d.pod} auf Knoten ${d.knoten}`;
+    } catch { /* kurz nicht erreichbar, z. B. beim Update */ }
+  }
+
+  ladeBestenliste();
+  ladeInfo();
+  setInterval(ladeInfo, 2000);
+</script>
+</body>
+</html>
+
