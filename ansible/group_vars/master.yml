@@ -1,0 +1,5 @@
+# Startparameter für jeden k3s-Master
+k3s_server_args: >-
+  --node-taint CriticalAddonsOnly=true:NoExecute
+  --tls-san {{ api_endpoint }}
+  --secrets-encryption

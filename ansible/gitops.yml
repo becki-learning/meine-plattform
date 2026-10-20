@@ -1,0 +1,46 @@
+---
+- name: Argo CD installieren und mit GitHub verbinden
+  hosts: master[0]
+  become: true
+  gather_facts: false
+  vars:
+    argocd_manifest: https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
+  tasks:
+    - name: Namespace argocd anlegen
+      ansible.builtin.shell: k3s kubectl create namespace argocd --dry-run=client -o yaml | k3s kubectl apply -f -
+      changed_when: false
+
+    - name: Argo CD installieren
+      ansible.builtin.command: >
+        k3s kubectl apply -n argocd --server-side --force-conflicts -f {{ argocd_manifest }}
+      changed_when: false
+
+    - name: Warten, bis Kubernetes den Typ "Application" kennt
+      ansible.builtin.command: k3s kubectl wait --for=condition=Established crd/applications.argoproj.io --timeout=120s
+      changed_when: false
+
+    - name: Warten, bis Argo CD läuft
+      ansible.builtin.command: k3s kubectl -n argocd rollout status {{ item }} --timeout=300s
+      loop:
+        - deployment/argocd-repo-server
+        - deployment/argocd-server
+        - statefulset/argocd-application-controller
+      changed_when: false
+
+    - name: Root-Application aus dem Template erzeugen
+      ansible.builtin.template:
+        src: templates/root-app.yaml.j2
+        dest: /root/root-app.yaml
+        mode: "0600"
+
+    - name: Root-Application anlegen
+      ansible.builtin.command: k3s kubectl apply -f /root/root-app.yaml
+      register: ergebnis
+      changed_when: "'unchanged' not in ergebnis.stdout"
+
+    - name: Wie geht's weiter?
+      ansible.builtin.debug:
+        msg:
+          - "Argo CD installiert jetzt alles aus {{ repo_url }}"
+          - "Fortschritt ansehen: make argocd"
+          - "Das Spiel: https://{{ spiel_host }} (Zertifikat kommt nach ein paar Minuten)"

@@ -1,0 +1,118 @@
+---
+# =====================================================================
+- name: 1) Alle Knoten vorbereiten
+  hosts: k3s
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Warten, bis der Server über den Bastion erreichbar ist
+      ansible.builtin.wait_for_connection:
+        timeout: 600
+
+    - name: Warten, bis Ubuntu fertig gebootet hat
+      ansible.builtin.command: cloud-init status --wait
+      register: cloud_init
+      changed_when: false
+      failed_when: cloud_init.rc not in [0, 2]   # 2 = fertig, aber mit Warnungen
+
+# =====================================================================
+- name: 2) Ersten Master starten – er gründet den Cluster
+  hosts: master[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: k3s-Server mit eingebettetem etcd installieren
+      ansible.builtin.shell: >
+        curl -sfL https://get.k3s.io |
+        K3S_TOKEN={{ k3s_token }}
+        sh -s - server --cluster-init {{ k3s_server_args }}
+      args:
+        creates: /usr/local/bin/k3s       # nur wenn noch nicht installiert -> idempotent
+
+    - name: Warten, bis der erste Master bereit ist
+      ansible.builtin.shell: k3s kubectl wait --for=condition=Ready node/$(hostname) --timeout=20s
+      register: bereit
+      until: bereit.rc == 0
+      retries: 20
+      delay: 10
+      changed_when: false
+
+# =====================================================================
+- name: 3) Master 2 und 3 dem Cluster hinzufügen – nacheinander!
+  hosts: master[1:]
+  become: true
+  gather_facts: false
+  serial: 1                               # etcd mag keine gleichzeitigen Beitritte
+  tasks:
+    - name: k3s-Server installieren und dem ersten Master beitreten
+      ansible.builtin.shell: >
+        curl -sfL https://get.k3s.io |
+        K3S_TOKEN={{ k3s_token }}
+        sh -s - server --server https://{{ groups['master'][0] }}:6443 {{ k3s_server_args }}
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Warten, bis dieser Master bereit ist
+      ansible.builtin.shell: k3s kubectl wait --for=condition=Ready node/$(hostname) --timeout=20s
+      register: bereit
+      until: bereit.rc == 0
+      retries: 20
+      delay: 10
+      changed_when: false
+
+# =====================================================================
+- name: 4) Worker hinzufügen – über den internen Load Balancer
+  hosts: workers
+  become: true
+  gather_facts: false
+  tasks:
+    - name: k3s-Agent installieren
+      ansible.builtin.shell: >
+        curl -sfL https://get.k3s.io |
+        K3S_URL=https://{{ api_endpoint }}:6443
+        K3S_TOKEN={{ k3s_token }}
+        sh -s - agent
+      args:
+        creates: /usr/local/bin/k3s
+
+# =====================================================================
+- name: 5) Cluster prüfen und kubeconfig holen
+  hosts: master[0]
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Warten, bis ALLE Knoten Ready sind
+      ansible.builtin.shell: k3s kubectl get nodes --no-headers | grep -c ' Ready'
+      register: anzahl
+      until: anzahl.stdout | int == groups['k3s'] | length
+      retries: 30
+      delay: 10
+      changed_when: false
+
+    - name: Workern die Rolle "worker" geben (nur Anzeige)
+      ansible.builtin.shell: >
+        k3s kubectl get nodes -l '!node-role.kubernetes.io/control-plane' -o name |
+        xargs -I{} k3s kubectl label {} node-role.kubernetes.io/worker=worker --overwrite
+      changed_when: false
+
+    - name: kubeconfig auf den Mac holen
+      ansible.builtin.fetch:
+        src: /etc/rancher/k3s/k3s.yaml
+        dest: "{{ playbook_dir }}/../kubeconfig"
+        flat: true
+
+    - name: kubeconfig nur für mich lesbar machen
+      ansible.builtin.file:
+        path: "{{ playbook_dir }}/../kubeconfig"
+        mode: "0600"
+      delegate_to: localhost
+      become: false
+
+    - name: Knoten anzeigen
+      ansible.builtin.command: k3s kubectl get nodes -o wide
+      register: knoten
+      changed_when: false
+
+    - name: Ergebnis
+      ansible.builtin.debug:
+        var: knoten.stdout_lines

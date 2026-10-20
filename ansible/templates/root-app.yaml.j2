@@ -1,0 +1,29 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: {{ repo_url }}
+    targetRevision: main
+    path: gitops/root
+    helm:
+      # Werte, die es erst zur Laufzeit gibt -> werden an das Chart übergeben
+      valuesObject:
+        repoURL: {{ repo_url }}
+        host: {{ spiel_host }}
+        email: {{ letsencrypt_email }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true        # in Git gelöscht -> im Cluster gelöscht
+      selfHeal: true     # im Cluster von Hand geändert -> zurück auf Git-Stand
+    retry:
+      limit: 20
+      backoff:
+        duration: 20s
+        factor: 1
