@@ -1,0 +1,7 @@
+# Wird von Argo CD überschrieben (kommt aus Terraform)
+host: spiel.example.sslip.io
+
+# Wird von GitHub Actions bei jedem Build aktualisiert
+image:
+  repository: ghcr.io/OWNER/reaktionsspiel
+  tag: "latest"
