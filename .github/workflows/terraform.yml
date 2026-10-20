@@ -1,0 +1,25 @@
+name: Terraform prüfen
+
+on:
+  pull_request:
+    paths: ["terraform/**", "bootstrap/**"]
+  push:
+    branches: [main]
+    paths: ["terraform/**", "bootstrap/**"]
+
+jobs:
+  pruefen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Formatierung
+        run: terraform fmt -check -recursive
+
+      - name: Bootstrap validieren
+        run: terraform -chdir=bootstrap init -backend=false && terraform -chdir=bootstrap validate
+
+      - name: Infrastruktur validieren
+        run: terraform -chdir=terraform init -backend=false && terraform -chdir=terraform validate
+

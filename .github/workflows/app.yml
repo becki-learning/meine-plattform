@@ -1,0 +1,44 @@
+name: App bauen und ausliefern
+
+on:
+  push:
+    branches: [main]
+    paths: ["app/**"]
+  workflow_dispatch:          # erlaubt auch manuelles Starten
+
+permissions:
+  contents: write             # um die neue Image-Version zurück ins Repo zu schreiben
+  packages: write             # um das Image in die GitHub Container Registry zu laden
+
+jobs:
+  bauen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Image-Namen festlegen (Registry verlangt Kleinbuchstaben)
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/reaktionsspiel" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: app
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+
+      - name: Neue Version in gitops/spiel/values.yaml eintragen
+        run: |
+          sed -i "s|^  repository: .*|  repository: ${IMAGE}|"   gitops/spiel/values.yaml
+          sed -i "s|^  tag: .*|  tag: \"${GITHUB_SHA}\"|"         gitops/spiel/values.yaml
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "spiel: Image ${GITHUB_SHA::7}" || echo "Nichts zu ändern"
+          git push
+
