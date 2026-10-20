@@ -1,0 +1,45 @@
+{
+  "title": "Reaktionsspiel",
+  "uid": "reaktionsspiel",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": { "from": "now-30m", "to": "now" },
+  "panels": [
+    {
+      "type": "stat", "title": "Runden gesamt",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(spiel_runden_total)" }]
+    },
+    {
+      "type": "stat", "title": "Median-Reaktionszeit (ms)",
+      "gridPos": { "x": 6, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "histogram_quantile(0.5, sum by (le) (rate(spiel_reaktionszeit_ms_bucket[15m])))" }]
+    },
+    {
+      "type": "stat", "title": "Laufende Spiel-Pods",
+      "gridPos": { "x": 12, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(kube_deployment_status_replicas_available{namespace=\"spiel\",deployment=\"reaktionsspiel\"})" }]
+    },
+    {
+      "type": "stat", "title": "Datenbank-Instanzen online",
+      "gridPos": { "x": 18, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum(cnpg_collector_up{namespace=\"spiel\"})" }]
+    },
+    {
+      "type": "timeseries", "title": "Runden pro Minute – je Pod",
+      "gridPos": { "x": 0, "y": 5, "w": 12, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (pod) (rate(spiel_runden_total[2m])) * 60", "legendFormat": "{{pod}}" }]
+    },
+    {
+      "type": "timeseries", "title": "CPU je Pod (Autoscaling bei 60 % von 0,1 CPU)",
+      "gridPos": { "x": 12, "y": 5, "w": 12, "h": 9 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "refId": "A", "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"spiel\",container=\"reaktionsspiel\"}[1m]))", "legendFormat": "{{pod}}" }]
+    }
+  ]
+}

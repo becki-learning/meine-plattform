@@ -1,0 +1,36 @@
+# Prometheus: hol dir die Messwerte der App ab
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: reaktionsspiel
+spec:
+  selector:
+    matchLabels:
+      app: reaktionsspiel
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
+---
+# Prometheus: hol dir die Messwerte der Datenbank ab
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: spiel-db
+spec:
+  selector:
+    matchLabels:
+      cnpg.io/cluster: spiel-db
+  podMetricsEndpoints:
+    - port: metrics
+---
+# Grafana: unser eigenes Dashboard (der Sidecar findet ConfigMaps mit diesem Label)
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dashboard-reaktionsspiel
+  labels:
+    grafana_dashboard: "1"
+data:
+  reaktionsspiel.json: |-
+{{ .Files.Get "dashboards/reaktionsspiel.json" | indent 4 }}

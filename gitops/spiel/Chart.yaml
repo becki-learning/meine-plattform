@@ -1,0 +1,4 @@
+apiVersion: v2
+name: spiel
+description: Reaktionsspiel mit PostgreSQL
+version: 0.1.0

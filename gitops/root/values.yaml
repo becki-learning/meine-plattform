@@ -1,0 +1,4 @@
+# Platzhalter – die echten Werte übergibt Ansible beim Bootstrap (root-app.yaml.j2)
+repoURL: https://github.com/OWNER/meine-plattform.git
+host: spiel.example.sslip.io
+email: hackeltom4@web.de

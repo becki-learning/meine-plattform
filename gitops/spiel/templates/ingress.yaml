@@ -1,0 +1,23 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: reaktionsspiel
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt   # <- cert-manager kümmert sich ums Zertifikat
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - {{ .Values.host }}
+      secretName: spiel-tls
+  rules:
+    - host: {{ .Values.host }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: reaktionsspiel
+                port:
+                  name: http

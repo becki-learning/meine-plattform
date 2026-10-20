@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reaktionsspiel
+  labels:
+    app: reaktionsspiel
+spec:
+  # Keine "replicas:" -> die Anzahl bestimmt der Autoscaler (hpa.yaml)
+  selector:
+    matchLabels:
+      app: reaktionsspiel
+  template:
+    metadata:
+      labels:
+        app: reaktionsspiel
+    spec:
+      # Pods möglichst gleichmäßig über die Worker verteilen
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: reaktionsspiel
+      containers:
+        - name: reaktionsspiel
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          ports:
+            - name: http
+              containerPort: 8000
+          env:
+            - name: KNOTEN                      # auf welchem Worker läuft der Pod?
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            # Zugangsdaten aus dem Secret, das CloudNativePG erzeugt hat
+            - name: PGHOST
+              valueFrom: { secretKeyRef: { name: spiel-db-app, key: host } }
+            - name: PGUSER
+              valueFrom: { secretKeyRef: { name: spiel-db-app, key: username } }
+            - name: PGPASSWORD
+              valueFrom: { secretKeyRef: { name: spiel-db-app, key: password } }
+            - name: PGDATABASE
+              valueFrom: { secretKeyRef: { name: spiel-db-app, key: dbname } }
+          readinessProbe:                       # erst Anfragen schicken, wenn bereit
+            httpGet: { path: /health, port: http }
+          livenessProbe:                        # hängt der Pod? -> neu starten
+            httpGet: { path: /health, port: http }
+            initialDelaySeconds: 15
+          resources:
+            requests:                           # garantiert – wichtig für Autoscaling
+              cpu: 100m
+              memory: 96Mi
+            limits:
+              memory: 192Mi

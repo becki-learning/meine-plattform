@@ -1,0 +1,25 @@
+# PostgreSQL-Cluster, betrieben von CloudNativePG
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: spiel-db
+spec:
+  instances: 2                    # 1 primär (schreibt) + 1 Replik (liest mit, springt bei Ausfall ein)
+
+  storage:
+    size: 2Gi                     # k3s legt die Daten lokal auf dem Worker ab (local-path)
+
+  affinity:
+    enablePodAntiAffinity: true
+    podAntiAffinityType: required # beide Instanzen MÜSSEN auf verschiedenen Workern laufen
+    topologyKey: kubernetes.io/hostname
+
+  bootstrap:
+    initdb:
+      database: spiel
+      owner: spiel                # Passwort erzeugt der Operator selbst -> Secret "spiel-db-app"
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi

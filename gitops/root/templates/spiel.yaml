@@ -1,0 +1,26 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: spiel
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: {{ .Values.repoURL }}
+    targetRevision: main
+    path: gitops/spiel
+    helm:
+      valuesObject:
+        host: {{ .Values.host | quote }}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: spiel
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, SkipDryRunOnMissingResource=true]
+    # Beim ersten Start fehlen evtl. noch die Typen von CloudNativePG/Prometheus -> einfach erneut versuchen
+    retry:
+      limit: 20
+      backoff:
+        duration: 30s
+        factor: 1

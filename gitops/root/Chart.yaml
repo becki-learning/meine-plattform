@@ -1,0 +1,4 @@
+apiVersion: v2
+name: root
+description: Plattform-Komponenten und Anwendungen
+version: 0.1.0

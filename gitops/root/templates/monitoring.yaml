@@ -1,0 +1,57 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: "*"
+    helm:
+      valuesObject:
+        # Alarmierung brauchen wir in der Übung nicht
+        alertmanager:
+          enabled: false
+
+        # Diese Komponenten sind bei k3s in einen Prozess eingebaut und nicht einzeln abfragbar
+        kubeEtcd: { enabled: false }
+        kubeControllerManager: { enabled: false }
+        kubeScheduler: { enabled: false }
+        kubeProxy: { enabled: false }
+
+        prometheus:
+          prometheusSpec:
+            retention: 1d
+            # Standardmäßig sammelt Prometheus nur Monitore mit einem bestimmten Label.
+            # So sammelt er ALLE – auch die unserer App und Datenbank.
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+
+        grafana:
+          # Dashboards aus allen Namespaces einsammeln (unser App-Dashboard liegt in "spiel")
+          sidecar:
+            dashboards:
+              searchNamespace: ALL
+          # Fertiges Community-Dashboard für CloudNativePG direkt von grafana.com laden
+          dashboardProviders:
+            dashboardproviders.yaml:
+              apiVersion: 1
+              providers:
+                - name: community
+                  folder: Community
+                  type: file
+                  options:
+                    path: /var/lib/grafana/dashboards/community
+          dashboards:
+            community:
+              cloudnative-pg:
+                gnetId: 20417
+                datasource: Prometheus
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated: { prune: true, selfHeal: true }
+    syncOptions: [CreateNamespace=true, ServerSideApply=true]

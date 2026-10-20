@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: reaktionsspiel
+  labels:
+    app: reaktionsspiel
+spec:
+  selector:
+    app: reaktionsspiel
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
